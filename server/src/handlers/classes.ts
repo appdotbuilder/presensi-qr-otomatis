@@ -1,49 +1,125 @@
 
+import { db } from '../db';
+import { classesTable, usersTable } from '../db/schema';
 import { type CreateClassInput, type UpdateClassInput, type Class } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function createClass(input: CreateClassInput): Promise<Class> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a new class with optional teacher assignment.
-    // Should validate teacher exists and has appropriate role.
-    return Promise.resolve({
-        id: 1,
+  try {
+    // Validate teacher exists and has teacher role if teacher_id is provided
+    if (input.teacher_id) {
+      const teacher = await db.select()
+        .from(usersTable)
+        .where(and(
+          eq(usersTable.id, input.teacher_id),
+          eq(usersTable.role, 'teacher')
+        ))
+        .execute();
+
+      if (teacher.length === 0) {
+        throw new Error('Teacher not found or user is not a teacher');
+      }
+    }
+
+    const result = await db.insert(classesTable)
+      .values({
         name: input.name,
-        teacher_id: input.teacher_id,
-        created_at: new Date(),
-        updated_at: new Date()
-    });
+        teacher_id: input.teacher_id
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Class creation failed:', error);
+    throw error;
+  }
 }
 
 export async function getClasses(): Promise<Class[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch all classes with teacher information.
-    // Should include teacher details in response for display purposes.
-    return Promise.resolve([]);
+  try {
+    const result = await db.select()
+      .from(classesTable)
+      .execute();
+
+    return result;
+  } catch (error) {
+    console.error('Failed to fetch classes:', error);
+    throw error;
+  }
 }
 
 export async function getClassById(id: number): Promise<Class | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch a specific class by ID with teacher and students.
-    // Should include related teacher and student data for comprehensive class view.
-    return Promise.resolve(null);
+  try {
+    const result = await db.select()
+      .from(classesTable)
+      .where(eq(classesTable.id, id))
+      .execute();
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Failed to fetch class by ID:', error);
+    throw error;
+  }
 }
 
 export async function updateClass(input: UpdateClassInput): Promise<Class> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update class information including teacher assignment.
-    // Should validate new teacher exists and update timestamp.
-    return Promise.resolve({
-        id: input.id,
-        name: 'Updated Class',
-        teacher_id: input.teacher_id || null,
-        created_at: new Date(),
-        updated_at: new Date()
-    });
+  try {
+    // Validate teacher exists and has teacher role if teacher_id is provided
+    if (input.teacher_id) {
+      const teacher = await db.select()
+        .from(usersTable)
+        .where(and(
+          eq(usersTable.id, input.teacher_id),
+          eq(usersTable.role, 'teacher')
+        ))
+        .execute();
+
+      if (teacher.length === 0) {
+        throw new Error('Teacher not found or user is not a teacher');
+      }
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {
+      updated_at: new Date()
+    };
+
+    if (input.name !== undefined) {
+      updateData.name = input.name;
+    }
+
+    if (input.teacher_id !== undefined) {
+      updateData.teacher_id = input.teacher_id;
+    }
+
+    const result = await db.update(classesTable)
+      .set(updateData)
+      .where(eq(classesTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error('Class not found');
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Class update failed:', error);
+    throw error;
+  }
 }
 
 export async function deleteClass(id: number): Promise<{ success: boolean }> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to delete a class.
-    // Should handle cascading updates for students (reassign or restrict deletion).
-    return Promise.resolve({ success: true });
+  try {
+    const result = await db.delete(classesTable)
+      .where(eq(classesTable.id, id))
+      .returning()
+      .execute();
+
+    return { success: result.length > 0 };
+  } catch (error) {
+    console.error('Class deletion failed:', error);
+    throw error;
+  }
 }
